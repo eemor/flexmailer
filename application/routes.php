@@ -37,66 +37,81 @@ return array(
 	//'GET /' => 'home@index',
 	//'GET /login, POST /login' => 'login@index',
 	//'GET /dash' => 'dash@index'
-	'GET /preview/(:any)' => 'preview@index',
-	'GET /track/(:any)/(:any)' => function($campaignname, $link) {
-		$ip - $_SERVER['REMOTE_ADDR'];
-		$m = new Mongo();
-		$mdb = $m->flexmailer;
-		$trackers = $mdb->tracker;
-		$campaigns = $mdb->campaign;
-		$thiscamp = $campaigns->findOne(array("_id" => $campaignname));
-		if ($thiscamp) {
-			$linkout = "link".$link;
-			$visit = $thiscamp[$linkout];
-			$trackers->insert(array('campaignname' => $campaignname, 'link' => $linkout, 'ip' => $ip));
-			return Redirect::to($visit);
-		} else {
-			echo ('Bad Address.');
-		}
-	},
-	'GET /opentrack/(:any)' => function($campaignname) {
-		$m = new Mongo();
-		$mdb = $m->flexmailer;
-		$opentrackers = $mdb->opentracker;
-		$trackers->insert(array('campaignname' => $campaignname, 'ip' => $ip));
-		header('Content-Type: image/gif');
-		echo base64_decode("R0lGODdhAQABAIAAAPxqbAAAACwAAAAAAQABAAACAkQBADs=");
-	},
-	'GET /unsub/(:any)/(:any)' => function($listname, $index) {
-		$m = new Mongo();
-		$mdb = $m->flexmailer;
-		$lists = $mdb->maillist;
-		if($lists->update(array('_id' => $listname), array('$pull' => array('candidates' => $index)))) {
-			echo("You have been successfully unsubscribed.");
-		} else {
-			echo("Bad Address");
-		}
-	},
-	'GET /report/(:any)' => function($campaignname) {
-		$m = new Mongo();
-		$mdb = $m->flexmailer;
-		$maillists = $mdb->maillist;
-		$campaigns = $mdb->campaigns;
-		$reports = $mdb->report;
-		$trackers = $mdb->tracker;
-		$opentrackers = $mdb->tracker;
-		$thiscamp = $campaigns->findOne(array('_id' => $campaignname));
-		$thisreport = $reports->find(array('campaignname' => $campaignname));
-		$thistrack = $reports->find(array('campaignname' => $campaignname));
-		$thistrackopen = $reports->find(array('campaignname' => $campaignname));
-		$opencount = $thistrackopen->count();
-		$linkarray = array();
-		for ($k=1; $k=4; $k++) {
-			$var = "link".$k;
-			if ($thiscamp[$var]!= NULL) {
-				array_push($linkarray, array($var => $thiscamp[$var]));
+		'GET /preview/(:any)' => 'preview@index',
+		'GET /track/(:any)/(:any)' => function($campaignname, $link) {
+			$ip = $_SERVER['REMOTE_ADDR'];
+			$link = (int) $link;
+			if ($link < 1 or $link > 4) {
+				return Response::error('404');
 			}
+			$m = new Mongo();
+			$mdb = $m->flexmailer;
+			$trackers = $mdb->tracker;
+			$campaigns = $mdb->campaign;
+			$thiscamp = $campaigns->findOne(array("_id" => $campaignname));
+			if ($thiscamp) {
+				$linkout = "link".$link;
+				$visit = isset($thiscamp[$linkout]) ? $thiscamp[$linkout] : null;
+				if (!$visit) {
+					return Response::error('404');
+				}
+				$trackers->insert(array('campaignname' => $campaignname, 'link' => $linkout, 'ip' => $ip));
+				return Redirect::to($visit);
+			} else {
+				return Response::error('404');
+			}
+		},
+		'GET /opentrack/(:any)' => function($campaignname) {
+			$ip = $_SERVER['REMOTE_ADDR'];
+			$m = new Mongo();
+			$mdb = $m->flexmailer;
+			$opentrackers = $mdb->opentracker;
+			$opentrackers->insert(array('campaignname' => $campaignname, 'ip' => $ip));
+			header('Content-Type: image/gif');
+			echo base64_decode("R0lGODdhAQABAIAAAPxqbAAAACwAAAAAAQABAAACAkQBADs=");
+		},
+		'GET /unsub/(:any)/(:any)' => function($listname, $index) {
+			if (!ctype_digit((string) $index)) {
+				return Response::error('404');
+			}
+			$index = (int) $index;
+			$m = new Mongo();
+			$mdb = $m->flexmailer;
+			$lists = $mdb->maillist;
+			$field = 'candidates.'.$index;
+			$unset = $lists->update(array('_id' => $listname), array('$unset' => array($field => 1)), array('safe' => true));
+			$lists->update(array('_id' => $listname), array('$pull' => array('candidates' => null)), array('safe' => true));
+			if($unset) {
+				echo("You have been successfully unsubscribed.");
+			} else {
+				echo("Bad Address");
 		}
-		
-		foreach($linkarray as $var => $link) {
-			
-		} 
-		return View::make('report.index')
+	},
+		'GET /report/(:any)' => function($campaignname) {
+			$m = new Mongo();
+			$mdb = $m->flexmailer;
+			$maillists = $mdb->maillist;
+			$campaigns = $mdb->campaign;
+			$reports = $mdb->report;
+				$trackers = $mdb->tracker;
+				$opentrackers = $mdb->opentracker;
+				$thiscamp = $campaigns->findOne(array('_id' => $campaignname));
+				if (!$thiscamp) {
+					return Response::error('404');
+				}
+				$thisreport = $reports->find(array('campaignname' => $campaignname));
+				$thistrack = $trackers->find(array('campaignname' => $campaignname));
+				$thistrackopen = $opentrackers->find(array('campaignname' => $campaignname));
+			$opencount = $thistrackopen->count();
+			$linkarray = array();
+			for ($k=1; $k<=4; $k++) {
+				$var = "link".$k;
+				if (isset($thiscamp[$var]) and $thiscamp[$var] != NULL) {
+					$linkcount = $trackers->find(array('campaignname' => $campaignname, 'link' => $var))->count();
+					array_push($linkarray, array($var => $thiscamp[$var], 'count' => $linkcount));
+				}
+			}
+			return View::make('report.index')
 		->with('campaignname', $campaignname)
 		->with('opencount', $opencount)
 		->with('linkarray', $linkarray)

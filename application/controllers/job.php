@@ -6,17 +6,17 @@ Class Job_Controller extends Controller {
 			$user = Auth::user();
 			$m = new Mongo();
 			$mdb = $m->flexmailer;
-			$maillists = $mdb->maillist;
-			$campaigns = $mdb->campaigns;
-			$jobs = $mdb->jobs;
-			$reports = $mdb->report;
-			if ($user->role = "admin") {
-				$myjobs = $jobs->find();
-			} else {
-				$myjobs = $jobs->find(array('userid' => Session::get("laravel_user_id")));
-			}
-			$jobdata = array();
-			$c=0;
+				$maillists = $mdb->maillist;
+				$campaigns = $mdb->campaigns;
+				$jobs = $mdb->jobs;
+				$reports = $mdb->report;
+				if ($user->role == "admin") {
+					$myjobs = $jobs->find();
+				} else {
+					$myjobs = $jobs->find(array('userid' => Session::get("laravel_user_id")));
+				}
+				$data = array();
+				$c=0;
 			foreach($myjobs as $job) {
 				$c++;
 				$jobname = $job['_id'];
@@ -76,12 +76,13 @@ Class Job_Controller extends Controller {
 			$listsql = Maillist::find($thiscamp['listid']);
 			$listname = $listsql->listname;
 			$candidates = $listsql->candidates;
-			$jobinsert = array('_id' => $user->username."_".date('d-m-Y_H_i'), 
-									'listname' => $listname, 
-									'campaignname' => $campaignname,
-									'candidates' => $candidates,
-									'sent' => 0,
-									'schedule' => $schedule,
+				$jobinsert = array('_id' => $user->username."_".date('d-m-Y_H_i'), 
+										'listname' => $listname, 
+										'campaignname' => $campaignname,
+										'userid' => Session::get('laravel_user_id'),
+										'candidates' => $candidates,
+										'sent' => 0,
+										'schedule' => $schedule,
 									'scheduletime' => $scheduletime,
 									'status' => 'processing'
 								);
