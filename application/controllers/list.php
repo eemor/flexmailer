@@ -27,13 +27,15 @@ Class List_Controller extends Controller {
 	public function action_manage() {
 		if (Auth::check()) {
 			$flash = Session::get('status');
-			$formerror = Session::get('formerror');
-			$formsuccess = Session::get('formsuccess');
-			$user = Auth::user();
-			$mylists = Maillist::where('user_id', '=', Session::get('laravel_user_id'))->get();
-			if ($user->role == "admin") {
-				$alllists = Maillist::where('user_id', '!=', Session::get('laravel_user_id'))->get();
-			} else {
+				$formerror = Session::get('formerror');
+				$formsuccess = Session::get('formsuccess');
+				$user = Auth::user();
+				$mylists = Maillist::where('user_id', '=', Session::get('laravel_user_id'))->get();
+				$sharedlists = array();
+				$alllists = array();
+				if ($user->role == "admin") {
+					$alllists = Maillist::where('user_id', '!=', Session::get('laravel_user_id'))->get();
+				} else {
 				$sharedquery = Share::where('user_id', '=', Session::get('laravel_user_id'))->get();
 				$sharedids = array();
 				foreach($sharedquery as $shared) {
@@ -81,9 +83,9 @@ Class List_Controller extends Controller {
 				Session::put('uploadid', $sessionid);
 				$templist->insert(array("_id" => $sessionid, "list" => array("name" => $listname)), array("safe" => true));
 				$type = Input::file('listupload.type');
-				if ($type != "text/csv" and $type != "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" and type != "application/vnd.ms-excel") {
-					return Redirect::to('/list/new')->with('formerror', 'Please upload a valid xls or csv. Error: '.$type);
-				}
+					if ($type != "text/csv" and $type != "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" and $type != "application/vnd.ms-excel") {
+						return Redirect::to('/list/new')->with('formerror', 'Please upload a valid xls or csv. Error: '.$type);
+					}
 				File::upload('listupload', $_SERVER['DOCUMENT_ROOT'].'/upload/'.$user->username.'_'.$listuploadname);
 				Session::put('uploadlist', $_SERVER['DOCUMENT_ROOT'].'/upload/'.$user->username.'_'.$listuploadname);
 				require_once ('PHPExcel/PHPExcel.php');
@@ -121,19 +123,20 @@ Class List_Controller extends Controller {
 				}
 				$count = 0;
 				foreach ($candidates as $index => $fieldarray) {
-					$email = $fieldarray['email'];
-					$e_mail = $fieldarray['e-mail'];
-					$e__mail = $fieldarray['e_mail'];
-					if (!filter_var($email, FILTER_VALIDATE_EMAIL) 
-						and !filter_var($e_mail, FILTER_VALIDATE_EMAIL) 
-						and !filter_var($e__mail, FILTER_VALIDATE_EMAIL)) {
-							unset($canidates[$index]);
-							if (!$email and !$e_mail and !$e__mail ) {	
-								unset($canidates[$index]);
-							}
+						$email = isset($fieldarray['email']) ? $fieldarray['email'] : null;
+						$e_mail = isset($fieldarray['e-mail']) ? $fieldarray['e-mail'] : null;
+						$e__mail = isset($fieldarray['e_mail']) ? $fieldarray['e_mail'] : null;
+						if (!filter_var($email, FILTER_VALIDATE_EMAIL) 
+							and !filter_var($e_mail, FILTER_VALIDATE_EMAIL) 
+							and !filter_var($e__mail, FILTER_VALIDATE_EMAIL)) {
+								unset($candidates[$index]);
+								if (!$email and !$e_mail and !$e__mail ) {	
+									unset($candidates[$index]);
+								}
+						} else {
+							$count++;
+						}
 					}
-						$count++;
-				}
 				$maillist->insert(array("_id" => $listname, "userid" => $sessionid, "fields" => $fields, "candidates" => $candidates));
 				$newlist = new Maillist;
 				$newlist->user_id = $sessionid;

@@ -31,9 +31,9 @@ Class Campaign_Controller extends Controller {
 			$formsuccess = Session::get('formsuccess');
 			$user = Auth::user();
 			$campaignname = Input::get('campaignname') ? Input::get('campaignname') : Session::get('campaignname');
-			if (!$campaignname or (strlen($campaignname)<=4 and !strlen($campaignname)>16)) {
-				return Redirect::to('/campaign/new')->with('formerror', 'Campaign name should be more than 4 chars and less than 16 chars.');
-			};
+				if (!$campaignname or strlen($campaignname) < 5 or strlen($campaignname) > 16) {
+					return Redirect::to('/campaign/new')->with('formerror', 'Campaign name should be more than 4 chars and less than 16 chars.');
+				};
 			$m = new Mongo();
 			$mdb = $m->flexmailer;
 			$tempcampaign = $mdb->tempcampaign;
@@ -48,10 +48,12 @@ Class Campaign_Controller extends Controller {
 				$tempcampaign->insert(array("_id" => $campaignname, "userid" => Session::get('laravel_user_id')), array("safe" => true));
 				Session::put('campaignname', $campaignname);
 			}
-			$mylists = Maillist::where('user_id', '=', Session::get('laravel_user_id'))->get();
-			if ($user->role == "admin") {
-				$alllists = Maillist::where('user_id', '!=', Session::get('laravel_user_id'))->get();
-			} else {
+				$mylists = Maillist::where('user_id', '=', Session::get('laravel_user_id'))->get();
+				$sharedlists = array();
+				$alllists = array();
+				if ($user->role == "admin") {
+					$alllists = Maillist::where('user_id', '!=', Session::get('laravel_user_id'))->get();
+				} else {
 				$sharedquery = Share::where('user_id', '=', Session::get('laravel_user_id'))->get();
 				$sharedids = array();
 				foreach($sharedquery as $shared) {
@@ -93,8 +95,8 @@ Class Campaign_Controller extends Controller {
 		$error .= !filter_var($sender, FILTER_VALIDATE_EMAIL) ? "Sender address should be valid <br/>" : "";
 		$error .= (!filter_var($link1, FILTER_VALIDATE_URL) and $link1) ? "Link 1 should be valid <br/>" : "";
 		$error .= (!filter_var($link2, FILTER_VALIDATE_URL) and $link2) ? "Link 2 should be valid <br/>" : "";
-		$error .= (!filter_var($link1, FILTER_VALIDATE_URL) and $link3) ? "Link 3 should be valid <br/>" : "";
-		$error .= (!filter_var($link1, FILTER_VALIDATE_URL) and $link4) ? "Link 4 should be valid <br/>" : "";
+			$error .= (!filter_var($link3, FILTER_VALIDATE_URL) and $link3) ? "Link 3 should be valid <br/>" : "";
+			$error .= (!filter_var($link4, FILTER_VALIDATE_URL) and $link4) ? "Link 4 should be valid <br/>" : "";
 		$error .= !$listid ? "A list selection is required" : "";
 		if ($error!="") {
 			return Redirect::to('/campaign/create1')
@@ -298,7 +300,10 @@ Class Campaign_Controller extends Controller {
 		$mailcontent = str_replace('##link2##', 		'http://'.$_SERVER['HTTP_HOST'].'/track/'.$campaignname.'/2', 		$mailcontent);
 		$mailcontent = str_replace('##link3##', 		'http://'.$_SERVER['HTTP_HOST'].'/track/'.$campaignname.'/3', 		$mailcontent);
 		$mailcontent = str_replace('##link4##', 		'http://'.$_SERVER['HTTP_HOST'].'/track/'.$campaignname.'/4', 		$mailcontent);
-		$mailcontent = str_replace('##unsub##', 	$unsub, 	$mailcontent);
+			$listquery = Maillist::find($thiscamp['listid']);
+			$listname = $listquery ? $listquery->listname : 'unknown';
+			$unsub = 'http://'.$_SERVER['HTTP_HOST'].'/unsub/'.$listname.'/##index##';
+			$mailcontent = str_replace('##unsub##', 	$unsub, 	$mailcontent);
 		include(__DIR__.'/../libraries/html2text.php');
 		$html = $mailcontent;
 		$text = html2text($mailcontent);
@@ -328,16 +333,22 @@ Class Campaign_Controller extends Controller {
 		$mdb = $m->flexmailer;
 		$campaign = $mdb->campaign;
 		$mycampaigns = $campaign->find(array('userid' => Session::get('laravel_user_id')));
-		if ($user->role == "admin") {
-			$allcampaigns = $campaign->find();
-			return View::make('campaign.manage')
+			if ($user->role == "admin") {
+				$allcampaigns = $campaign->find();
+				return View::make('campaign.manage')
 				->with('status', $flash)
 				->with('user', $user)
 				->with('formerror', $formerror)
 				->with('formsuccess', $formsuccess)
 				->with('mycampaigns', $mycampaigns)
-				->with('allcampaigns', $allcampaigns)
-				;
+					->with('allcampaigns', $allcampaigns)
+					;
+			}
+			return View::make('campaign.manage')
+				->with('status', $flash)
+				->with('user', $user)
+				->with('formerror', $formerror)
+				->with('formsuccess', $formsuccess)
+				->with('mycampaigns', $mycampaigns);
 		}
 	}
-}
